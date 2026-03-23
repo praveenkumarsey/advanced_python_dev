@@ -1,0 +1,40 @@
+# rules.yaml — declarative validation rule definitions for Validify.
+#
+# Each entry describes one rule to apply during validation.
+# The "type" field maps to a registered validator class via ValidatorRegistry.
+# You implement RuleFactory.from_config() on Day 3 to parse this file.
+#
+# Adding a new rule = adding an entry here + a matching class in built_in.py.
+# No changes needed anywhere else.
+
+rules:
+  - name: vendor_id_not_null
+    type: null_check
+    field: vendor_id
+
+  - name: pickup_datetime_not_null
+    type: null_check
+    field: pickup_datetime
+
+  - name: passenger_count_range
+    type: range_check
+    field: passenger_count
+    min: 1
+    max: 8
+
+  - name: trip_distance_range
+    type: range_check
+    field: trip_distance
+    min: 0.1
+    max: 200.0
+
+  - name: fare_amount_range
+    type: range_check
+    field: fare_amount
+    min: 0.01
+    max: 500.0
+
+  - name: payment_type_valid
+    type: regex_check
+    field: payment_type
+    pattern: "^(Credit|Cash|No Charge|Dispute)$"

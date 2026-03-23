@@ -1,0 +1,167 @@
+"""
+07_method_overriding_and_abc.py
+=================================
+Demonstrates:
+  - Overriding a method in a subclass
+  - Using super() to extend (not replace) base behaviour
+  - Abstract Base Classes (ABC) to define a required interface
+  - @abstractmethod to enforce that subclasses implement specific methods
+
+Domain: data exporters (CSV, JSON, Parquet).
+
+Run:
+    python day-01/07_method_overriding_and_abc.py
+"""
+
+from abc import ABC, abstractmethod
+import json
+import io
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PART 1: Method overriding with super()
+# ══════════════════════════════════════════════════════════════════════════════
+
+class BaseExporter:
+    """Base exporter: wraps output with a header and footer."""
+
+    def export(self, rows: list[dict]) -> str:
+        header = self._header()
+        body = self._body(rows)
+        footer = self._footer()
+        return f"{header}\n{body}\n{footer}"
+
+    def _header(self) -> str:
+        return "--- BEGIN EXPORT ---"
+
+    def _body(self, rows: list[dict]) -> str:
+        return "\n".join(str(row) for row in rows)
+
+    def _footer(self) -> str:
+        return "--- END EXPORT ---"
+
+
+class TSVExporter(BaseExporter):
+    """Overrides _body to produce tab-separated output.
+
+    Calls super()._header() and super()._footer() unchanged.
+    """
+
+    def _body(self, rows: list[dict]) -> str:
+        if not rows:
+            return ""
+        headers = "\t".join(rows[0].keys())
+        lines = [headers]
+        for row in rows:
+            lines.append("\t".join(str(v) for v in row.values()))
+        return "\n".join(lines)
+
+    def _footer(self) -> str:
+        # Extend the base footer rather than replace it entirely
+        base_footer = super()._footer()
+        return f"{base_footer}  [TSV format]"
+
+
+def demo_overriding():
+    print("=" * 50)
+    print("PART 1: Method overriding and super()")
+    print("=" * 50)
+
+    data = [
+        {"city": "Mumbai", "users": 1200},
+        {"city": "Delhi",  "users": 980},
+    ]
+
+    base = BaseExporter()
+    tsv = TSVExporter()
+
+    print("-- BaseExporter --")
+    print(base.export(data))
+
+    print("\n-- TSVExporter (overrides _body, extends _footer) --")
+    print(tsv.export(data))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PART 2: Abstract Base Classes — enforcing a contract
+# ══════════════════════════════════════════════════════════════════════════════
+
+class Exporter(ABC):
+    """Contract: any concrete Exporter must implement export()."""
+
+    @abstractmethod
+    def export(self, rows: list[dict]) -> str:
+        """Convert rows to an output string in this exporter's format."""
+        ...
+
+    def export_to_stream(self, rows: list[dict], stream: io.StringIO) -> None:
+        """Non-abstract helper — subclasses get this for free."""
+        stream.write(self.export(rows))
+
+
+class CSVExporter(Exporter):
+    def export(self, rows: list[dict]) -> str:
+        if not rows:
+            return ""
+        headers = ",".join(rows[0].keys())
+        lines = [headers] + [
+            ",".join(str(v) for v in row.values()) for row in rows
+        ]
+        return "\n".join(lines)
+
+
+class JSONExporter(Exporter):
+    def export(self, rows: list[dict]) -> str:
+        return json.dumps(rows, indent=2)
+
+
+# ParquetExporter is declared but does NOT implement export() —
+# instantiating it will raise TypeError.
+class ParquetExporter(Exporter):
+    pass  # forgot to implement export()
+
+
+def demo_abc():
+    print("\n" + "=" * 50)
+    print("PART 2: Abstract Base Classes")
+    print("=" * 50)
+
+    data = [
+        {"product": "widget", "qty": 50},
+        {"product": "gadget", "qty": 20},
+    ]
+
+    # Concrete implementations work fine
+    for cls in (CSVExporter, JSONExporter):
+        exp = cls()
+        print(f"\n-- {cls.__name__} --")
+        print(exp.export(data))
+
+    # Trying to instantiate Exporter directly raises TypeError
+    print("\n-- Attempting to instantiate abstract Exporter directly --")
+    try:
+        Exporter()
+    except TypeError as e:
+        print(f"TypeError: {e}")
+
+    # Trying to instantiate an incomplete subclass also raises TypeError
+    print("\n-- Attempting to instantiate ParquetExporter (missing export()) --")
+    try:
+        ParquetExporter()
+    except TypeError as e:
+        print(f"TypeError: {e}")
+
+    # Inherited non-abstract method works on concrete subclasses
+    print("\n-- Using inherited export_to_stream() on CSVExporter --")
+    buffer = io.StringIO()
+    CSVExporter().export_to_stream(data, buffer)
+    print(buffer.getvalue())
+
+
+def main():
+    demo_overriding()
+    demo_abc()
+
+
+if __name__ == "__main__":
+    main()
